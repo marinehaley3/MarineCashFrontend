@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect, useContext } from "react";
-import { loginUser, registerUser, getProfile } from "../api/index";
+import API from "../api/axios";
 
 const AuthContext = createContext();
 
@@ -14,8 +14,8 @@ const AuthProvider = ({ children }) => {
     const fetchUser = async () => {
       if (!token) { setLoading(false); return; }
       try {
-        const res = await getProfile();
-        setUser(res.user || res);
+        const res = await API.get("/auth/me");
+        setUser(res.data.user || res.data);
       } catch {
         handleLogout();
       } finally {
@@ -26,17 +26,17 @@ const AuthProvider = ({ children }) => {
   }, [token]);
 
   const login = async (formData) => {
-    const res = await loginUser(formData);
-    localStorage.setItem("token", res.token);
-    localStorage.setItem("user", JSON.stringify(res.user));
-    setToken(res.token);
-    setUser(res.user);
-    return res;
+    const res = await API.post("/auth/login", formData);
+    localStorage.setItem("token", res.data.token);
+    localStorage.setItem("user", JSON.stringify(res.data.user));
+    setToken(res.data.token);
+    setUser(res.data.user);
+    return res.data;
   };
 
   const register = async (formData) => {
-    const res = await registerUser(formData);
-    return res;
+    const res = await API.post("/auth/register", formData);
+    return res.data;
   };
 
   const handleLogout = () => {
