@@ -1,18 +1,18 @@
 import React, { useEffect, useState } from "react";
-import { adminGetSettings, adminCreatePoll, adminClosePoll, adminDeletePoll } from "../../api/index";
+import API from "../../api/axios";
 
 const AdminPolls = () => {
-  const [polls, setPolls]   = useState([]);
+  const [polls, setPolls]     = useState([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [msg, setMsg]       = useState({ text: "", success: true });
-  const [form, setForm]     = useState({ question: "", options: ["", ""], expiresAt: "" });
+  const [saving, setSaving]   = useState(false);
+  const [msg, setMsg]         = useState({ text: "", success: true });
+  const [form, setForm]       = useState({ question: "", options: ["", ""], expiresAt: "" });
 
   const flash = (t, s = true) => { setMsg({ text: t, success: s }); setTimeout(() => setMsg({ text: "", success: true }), 3000); };
 
   const fetchPolls = () => {
-    adminGetSettings()
-      .then((s) => setPolls(s.polls || []))
+    API.get("/admin/polls")
+      .then((res) => setPolls(res.data.polls || res.data))
       .catch(console.error)
       .finally(() => setLoading(false));
   };
@@ -27,7 +27,7 @@ const AdminPolls = () => {
     });
   };
 
-  const handleAddOption = () => setForm((prev) => ({ ...prev, options: [...prev.options, ""] }));
+  const handleAddOption    = () => setForm((prev) => ({ ...prev, options: [...prev.options, ""] }));
   const handleRemoveOption = (i) => setForm((prev) => ({ ...prev, options: prev.options.filter((_, idx) => idx !== i) }));
 
   const handleCreate = async (e) => {
@@ -36,7 +36,7 @@ const AdminPolls = () => {
     if (!form.question.trim() || opts.length < 2) return flash("❌ Need a question and at least 2 options.", false);
     setSaving(true);
     try {
-      await adminCreatePoll({ question: form.question.trim(), options: opts, expiresAt: form.expiresAt || undefined });
+      await API.post("/admin/polls", { question: form.question.trim(), options: opts, expiresAt: form.expiresAt || undefined });
       setForm({ question: "", options: ["", ""], expiresAt: "" });
       flash("✅ Poll created!");
       fetchPolls();
@@ -45,13 +45,13 @@ const AdminPolls = () => {
   };
 
   const handleClose = async (id) => {
-    try { await adminClosePoll(id); flash("Poll closed ✅"); fetchPolls(); }
+    try { await API.patch(`/admin/polls/${id}/close`); flash("Poll closed ✅"); fetchPolls(); }
     catch (e) { flash("❌ Failed.", false); }
   };
 
   const handleDelete = async (id) => {
     if (!confirm("Delete this poll?")) return;
-    try { await adminDeletePoll(id); flash("✅ Deleted"); fetchPolls(); }
+    try { await API.delete(`/admin/polls/${id}`); flash("✅ Deleted"); fetchPolls(); }
     catch (e) { flash("❌ Failed.", false); }
   };
 
