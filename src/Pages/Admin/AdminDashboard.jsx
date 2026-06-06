@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { adminGetAnalytics, adminGetSettings } from "../../api/index";
+import API from "../../api/axios";
 
 const StatCard = ({ icon, label, value, color }) => (
   <div className="bg-white rounded-xl shadow p-4 flex items-center gap-4">
@@ -19,8 +19,11 @@ const AdminDashboard = () => {
   const [loading, setLoading]     = useState(true);
 
   useEffect(() => {
-    Promise.all([adminGetAnalytics(), adminGetSettings()])
-      .then(([a, s]) => { setAnalytics(a); setSettings(s); })
+    Promise.all([
+      API.get("/admin/analytics"),
+      API.get("/admin/settings"),
+    ])
+      .then(([aRes, sRes]) => { setAnalytics(aRes.data); setSettings(sRes.data); })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
@@ -37,10 +40,10 @@ const AdminDashboard = () => {
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard icon="fa-users"       label="Total Users"       value={analytics?.totalUsers    ?? "—"} color="bg-purple-500" />
-        <StatCard icon="fa-ban"         label="Blocked Users"     value={analytics?.blockedUsers  ?? "—"} color="bg-red-500" />
-        <StatCard icon="fa-list-check"  label="Total Campaigns"   value={analytics?.totalCampaigns ?? "—"} color="bg-blue-500" />
-        <StatCard icon="fa-dollar-sign" label="Platform Revenue"  value={`$${Number(analytics?.totalRevenue ?? 0).toFixed(2)}`} color="bg-green-500" />
+        <StatCard icon="fa-users"       label="Total Users"      value={analytics?.totalUsers      ?? "—"} color="bg-purple-500" />
+        <StatCard icon="fa-ban"         label="Blocked Users"    value={analytics?.blockedUsers    ?? "—"} color="bg-red-500" />
+        <StatCard icon="fa-list-check"  label="Total Campaigns"  value={analytics?.totalCampaigns  ?? "—"} color="bg-blue-500" />
+        <StatCard icon="fa-dollar-sign" label="Platform Revenue" value={`$${Number(analytics?.totalRevenue ?? 0).toFixed(2)}`} color="bg-green-500" />
       </div>
 
       {/* Current Settings snapshot */}
@@ -51,15 +54,15 @@ const AdminDashboard = () => {
         {settings ? (
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
             {[
-              { label: "Platform Fee",     value: settings.platformFeePct    != null ? `${settings.platformFeePct}%`   : "Not set" },
-              { label: "Withdrawal Fee",   value: settings.withdrawalFeePct  != null ? `${settings.withdrawalFeePct}%` : "Not set" },
-              { label: "Offerwall Fee",    value: settings.offerwallFeePct   != null ? `${settings.offerwallFeePct}%`  : "Not set" },
-              { label: "Min Withdrawal",   value: settings.minWithdrawal     != null ? `$${settings.minWithdrawal}`    : "Not set" },
-              { label: "Signup Bonus",     value: settings.signupBonus       != null ? `$${settings.signupBonus}`      : "Not set" },
-              { label: "Daily Check-in",   value: settings.dailyCheckInAmount != null ? `$${settings.dailyCheckInAmount}` : "Not set" },
-              { label: "Check-in Enabled", value: settings.dailyCheckInEnabled != null ? (settings.dailyCheckInEnabled ? "Yes" : "No") : "Not set" },
+              { label: "Platform Fee",        value: settings.platformFeePct       != null ? `${settings.platformFeePct}%`      : "Not set" },
+              { label: "Withdrawal Fee",      value: settings.withdrawalFeePct     != null ? `${settings.withdrawalFeePct}%`    : "Not set" },
+              { label: "Offerwall Fee",       value: settings.offerwallFeePct      != null ? `${settings.offerwallFeePct}%`     : "Not set" },
+              { label: "Min Withdrawal",      value: settings.minWithdrawal        != null ? `$${settings.minWithdrawal}`       : "Not set" },
+              { label: "Signup Bonus",        value: settings.signupBonus          != null ? `$${settings.signupBonus}`         : "Not set" },
+              { label: "Daily Check-in",      value: settings.dailyCheckInAmount   != null ? `$${settings.dailyCheckInAmount}`  : "Not set" },
+              { label: "Check-in Enabled",    value: settings.dailyCheckInEnabled  != null ? (settings.dailyCheckInEnabled ? "Yes" : "No") : "Not set" },
               { label: "Referral Commission", value: settings.referralCommissionPct != null ? `${settings.referralCommissionPct}%` : "Not set" },
-              { label: "Maintenance Mode", value: settings.maintenanceMode != null ? (settings.maintenanceMode ? "ON 🔴" : "OFF 🟢") : "Not set" },
+              { label: "Maintenance Mode",    value: settings.maintenanceMode      != null ? (settings.maintenanceMode ? "ON 🔴" : "OFF 🟢") : "Not set" },
             ].map(({ label, value }) => (
               <div key={label} className="bg-gray-50 rounded-xl p-3">
                 <p className="text-xs text-gray-400 font-medium">{label}</p>
