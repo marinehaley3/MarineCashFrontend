@@ -1,18 +1,18 @@
 import React, { useEffect, useState } from "react";
-import { adminGetSettings, adminAddAnnouncement, adminUpdateAnnouncement, adminDeleteAnnouncement } from "../../api/index";
+import API from "../../api/axios";
 
 const AdminAnnouncements = () => {
-  const [items, setItems]   = useState([]);
-  const [text, setText]     = useState("");
+  const [items, setItems]     = useState([]);
+  const [text, setText]       = useState("");
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [msg, setMsg]       = useState({ text: "", success: true });
+  const [saving, setSaving]   = useState(false);
+  const [msg, setMsg]         = useState({ text: "", success: true });
 
   const flash = (t, s = true) => { setMsg({ text: t, success: s }); setTimeout(() => setMsg({ text: "", success: true }), 3000); };
 
   const fetchAnnouncements = () => {
-    adminGetSettings()
-      .then((s) => setItems(s.announcements || []))
+    API.get("/admin/announcements")
+      .then((res) => setItems(res.data.announcements || res.data))
       .catch(console.error)
       .finally(() => setLoading(false));
   };
@@ -24,7 +24,7 @@ const AdminAnnouncements = () => {
     if (!text.trim()) return;
     setSaving(true);
     try {
-      await adminAddAnnouncement(text.trim());
+      await API.post("/admin/announcements", { text: text.trim() });
       setText("");
       flash("✅ Announcement added!");
       fetchAnnouncements();
@@ -34,7 +34,7 @@ const AdminAnnouncements = () => {
 
   const handleToggle = async (id, isActive) => {
     try {
-      await adminUpdateAnnouncement(id, { isActive: !isActive });
+      await API.patch(`/admin/announcements/${id}`, { isActive: !isActive });
       flash(`${!isActive ? "Shown" : "Hidden"} ✅`);
       fetchAnnouncements();
     } catch (e) { flash("❌ Failed.", false); }
@@ -43,7 +43,7 @@ const AdminAnnouncements = () => {
   const handleDelete = async (id) => {
     if (!confirm("Delete this announcement?")) return;
     try {
-      await adminDeleteAnnouncement(id);
+      await API.delete(`/admin/announcements/${id}`);
       flash("✅ Deleted");
       fetchAnnouncements();
     } catch (e) { flash("❌ Failed.", false); }
