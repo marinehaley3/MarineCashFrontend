@@ -231,4 +231,39 @@ const AdminSettings = () => {
       <h2 className="text-lg font-extrabold text-gray-800">Platform Settings</h2>
 
       {msg.text && (
-        <div className={`p-3 rounded-xl text-sm font-semibold text-cen
+        <div className={`p-3 rounded-xl text-sm font-semibold text-center ${msg.success ? "bg-green-50 text-green-600" : "bg-red-50 text-red-600"}`}>
+          {msg.text}
+        </div>
+      )}
+
+      {sections.map((section) => (
+        <div key={section.key} className="bg-white rounded-xl shadow p-5">
+          <h3 className="font-bold text-gray-700 mb-4">{section.title}</h3>
+          <div className="space-y-3">
+            {section.inputs.map((input) => (
+              <Field
+                key={input.name}
+                label={input.label}
+                name={input.name}
+                value={form[input.name]}
+                onChange={handleChange}
+                type={input.type || "number"}
+                hint={input.hint}
+              />
+            ))}
+            {section.extras}
+          </div>
+          <button
+            onClick={() => handleSave(section)}
+            disabled={saving === section.key}
+            className="mt-4 bg-orange-500 hover:bg-orange-600 text-white font-bold px-6 py-2 rounded-xl text-sm transition disabled:opacity-50"
+          >
+            {saving === section.key ? "Saving..." : "Save"}
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+export default AdminSettings;
