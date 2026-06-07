@@ -21,6 +21,7 @@ import NotFound from "./Pages/NotFound";
 import PostTask from "./Pages/PostTask";
 import TaskStatus from "./Pages/TaskStatus";
 import AdminCampaigns from "./Pages/Admin/AdminCampaigns";
+import Campaigns from "./Pages/Campaigns";
 
 
 const App = () => (
@@ -47,6 +48,7 @@ const App = () => (
                 <Route path="/post-task"   element={<ProtectedRoute><PostTask /></ProtectedRoute>} />
                 <Route path="/task-status" element={<ProtectedRoute><TaskStatus /></ProtectedRoute>} />
                 <Route path="campaigns" element={<AdminCampaigns />} />
+                <Route path="/campaigns" element={<ProtectedRoute><Campaigns /></ProtectedRoute>} />
               </Routes>
             </Router>
           </ChatProvider>
