@@ -4,6 +4,7 @@ import API from "../api/axios";
 import TopBar from "../Components/TopBar";
 import BottomNav from "../Components/BottomNav";
 import { WalletContext } from "../Context/WalletContext";
+import { CampaignContext } from "../Context/CampaignContext";
 
 const STATUS_COLORS = {
   pending_approval: "bg-yellow-100 text-yellow-700",
@@ -24,20 +25,28 @@ const SUB_COLORS = {
 export default function TaskStatus() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { wallet, fetchWallet } = useContext(WalletContext);
+  const { wallet, setWallet } = useContext(WalletContext);
+  const { markSeen } = useContext(CampaignContext);
 
-  const [campaigns, setCampaigns]         = useState([]);
-  const [loading, setLoading]             = useState(true);
-  const [expanded, setExpanded]           = useState(null);
-  const [detail, setDetail]               = useState({});
-  const [topUpId, setTopUpId]             = useState(null);
-  const [topUpAmount, setTopUpAmount]     = useState("");
-  const [msg, setMsg]                     = useState({ text: "", success: true });
-  const [tab, setTab]                     = useState("mine");
+  const [campaigns, setCampaigns]     = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [expanded, setExpanded]       = useState(null);
+  const [detail, setDetail]           = useState({});
+  const [topUpId, setTopUpId]         = useState(null);
+  const [topUpAmount, setTopUpAmount] = useState("");
+  const [msg, setMsg]                 = useState({ text: "", success: true });
+  const [tab, setTab]                 = useState("mine");
 
   const flash = (t, s = true) => {
     setMsg({ text: t, success: s });
     setTimeout(() => setMsg({ text: "", success: true }), 4000);
+  };
+
+  const refreshWallet = async () => {
+    try {
+      const res = await API.get("/wallet");
+      setWallet(res.data);
+    } catch {}
   };
 
   const fetchMine = async () => {
@@ -55,7 +64,6 @@ export default function TaskStatus() {
     if (tab === "mine") fetchMine();
   }, [tab]);
 
-  // Auto-open submit flow if redirected from Campaigns page
   useEffect(() => {
     const submitId = searchParams.get("submit");
     if (submitId) {
@@ -75,6 +83,13 @@ export default function TaskStatus() {
     }
   };
 
+  const refreshDetail = async (id) => {
+    try {
+      const res = await API.get(`/campaign/${id}`);
+      setDetail((p) => ({ ...p, [id]: res.data }));
+    } catch {}
+  };
+
   const handleTopUp = async (id) => {
     if (!topUpAmount || Number(topUpAmount) <= 0)
       return flash("❌ Enter a valid top-up amount.", false);
@@ -84,7 +99,7 @@ export default function TaskStatus() {
       setTopUpId(null);
       setTopUpAmount("");
       fetchMine();
-      if (fetchWallet) fetchWallet();
+      refreshWallet();
     } catch (e) {
       flash("❌ " + (e.response?.data?.message || "Failed."), false);
     }
@@ -95,6 +110,7 @@ export default function TaskStatus() {
       await API.put(`/campaign/${id}/${action}`);
       flash(`✅ Campaign ${action}d.`);
       fetchMine();
+      if (action === "stop") refreshWallet();
     } catch (e) {
       flash("❌ " + (e.response?.data?.message || "Failed."), false);
     }
@@ -107,10 +123,9 @@ export default function TaskStatus() {
         rejectionReason: reason,
       });
       flash(`✅ Submission ${action}d.`);
-      const res = await API.get(`/campaign/${campaignId}`);
-      setDetail((p) => ({ ...p, [campaignId]: res.data }));
+      await refreshDetail(campaignId);
       fetchMine();
-      if (fetchWallet) fetchWallet();
+      if (action === "approve") refreshWallet();
     } catch (e) {
       flash("❌ " + (e.response?.data?.message || "Failed."), false);
     }
@@ -181,9 +196,9 @@ export default function TaskStatus() {
             <div className="space-y-3">
               {campaigns.map((c) => {
                 const d = detail[c._id];
-                const pendingSubs = d?.campaign?.submissions
-                  ? d.campaign.submissions.filter((s) => s.status === "pending")
-                  : [];
+                const allSubs = d?.campaign?.submissions || [];
+                const pendingSubs  = allSubs.filter((s) => s.status === "pending");
+                const reviewedSubs = allSubs.filter((s) => s.status !== "pending");
 
                 return (
                   <div key={c._id} className="bg-white rounded-2xl shadow overflow-hidden">
@@ -201,12 +216,11 @@ export default function TaskStatus() {
                             </span>
                             {c.pendingCount > 0 && (
                               <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700">
-                                {c.pendingCount} pending review
+                                ⏳ {c.pendingCount} pending review
                               </span>
                             )}
                           </div>
 
-                          {/* Status-specific messages */}
                           {c.status === "pending_approval" && (
                             <p className="text-xs text-yellow-600 font-semibold mt-1.5 bg-yellow-50 rounded-lg px-2 py-1">
                               ⏳ Funds held · Awaiting admin review
@@ -227,7 +241,6 @@ export default function TaskStatus() {
                           )}
                         </div>
 
-                        {/* Only show Manage for non-terminal, non-pending statuses */}
                         {!["pending_approval", "rejected", "stopped"].includes(c.status) && (
                           <button
                             onClick={() => openDetail(c._id)}
@@ -238,7 +251,6 @@ export default function TaskStatus() {
                         )}
                       </div>
 
-                      {/* Budget progress bar */}
                       {["active", "paused", "exhausted"].includes(c.status) && (
                         <div className="mt-3">
                           <div className="flex justify-between text-xs text-gray-400 mb-1">
@@ -262,7 +274,7 @@ export default function TaskStatus() {
                     {expanded === c._id && (
                       <div className="border-t border-gray-100 p-4 space-y-4">
 
-                        {/* Action buttons — no Fund button anymore */}
+                        {/* Action buttons */}
                         <div className="flex gap-2 flex-wrap">
                           {c.status === "active" && (
                             <button
@@ -325,11 +337,25 @@ export default function TaskStatus() {
                           </div>
                         )}
 
-                        {/* Pending submissions to review */}
+                        {/* Stats summary */}
+                        <div className="grid grid-cols-3 gap-2 text-xs">
+                          {[
+                            ["Approved", c.approvedCount, "text-green-600"],
+                            ["Pending",  c.pendingCount,  "text-yellow-600"],
+                            ["Rejected", c.rejectedCount, "text-red-500"],
+                          ].map(([k, v, color]) => (
+                            <div key={k} className="bg-gray-50 rounded-xl p-2 text-center">
+                              <p className="text-gray-400">{k}</p>
+                              <p className={`font-extrabold text-lg ${color}`}>{v}</p>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Pending submissions */}
                         {pendingSubs.length > 0 && (
                           <div>
                             <p className="text-xs font-bold text-gray-700 mb-2">
-                              Pending Reviews ({pendingSubs.length})
+                              ⏳ Pending Reviews ({pendingSubs.length})
                             </p>
                             <div className="space-y-3">
                               {pendingSubs.map((s) => (
@@ -344,19 +370,68 @@ export default function TaskStatus() {
                           </div>
                         )}
 
-                        {/* Stats summary */}
-                        <div className="grid grid-cols-3 gap-2 text-xs">
-                          {[
-                            ["Approved", c.approvedCount, "text-green-600"],
-                            ["Pending",  c.pendingCount,  "text-yellow-600"],
-                            ["Rejected", c.rejectedCount, "text-red-500"],
-                          ].map(([k, v, color]) => (
-                            <div key={k} className="bg-gray-50 rounded-xl p-2 text-center">
-                              <p className="text-gray-400">{k}</p>
-                              <p className={`font-extrabold text-lg ${color}`}>{v}</p>
+                        {/* Reviewed submissions */}
+                        {reviewedSubs.length > 0 && (
+                          <div>
+                            <p className="text-xs font-bold text-gray-500 mb-2">
+                              Reviewed ({reviewedSubs.length})
+                            </p>
+                            <div className="space-y-2">
+                              {reviewedSubs.map((s) => (
+                                <div key={s._id} className="bg-gray-50 rounded-xl p-3 space-y-1.5">
+                                  <div className="flex items-center justify-between">
+                                    <p className="text-xs font-bold text-gray-700">
+                                      {s.user?.fullName || "User"}
+                                    </p>
+                                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${SUB_COLORS[s.status] || "bg-gray-100 text-gray-500"}`}>
+                                      {s.status === "auto_approved" ? "auto approved" : s.status}
+                                    </span>
+                                  </div>
+                                  <p className="text-[10px] text-gray-400">
+                                    {new Date(s.submittedAt).toLocaleString()}
+                                  </p>
+                                  {s.proofText && (
+                                    <p className="text-xs text-gray-500 bg-white rounded-lg px-2 py-1.5">
+                                      {s.proofText}
+                                    </p>
+                                  )}
+                                  {s.proofUrl && (
+                                    <a
+                                      href={s.proofUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-xs text-blue-500 underline break-all block"
+                                    >
+                                      {s.proofUrl}
+                                    </a>
+                                  )}
+                                  {s.proofImageUrls?.length > 0 && (
+                                    <div className="flex gap-2 flex-wrap">
+                                      {s.proofImageUrls.map((url, i) => (
+                                        <img
+                                          key={i}
+                                          src={url}
+                                          alt=""
+                                          onClick={() => window.open(url, "_blank")}
+                                          className="w-14 h-14 object-cover rounded-lg border border-gray-200 cursor-pointer"
+                                        />
+                                      ))}
+                                    </div>
+                                  )}
+                                  {s.status === "rejected" && s.rejectionReason && (
+                                    <p className="text-[11px] text-red-500 bg-red-50 rounded-lg px-2 py-1.5">
+                                      <span className="font-bold">Reason:</span> {s.rejectionReason}
+                                    </p>
+                                  )}
+                                </div>
+                              ))}
                             </div>
-                          ))}
-                        </div>
+                          </div>
+                        )}
+
+                        {allSubs.length === 0 && (
+                          <p className="text-xs text-gray-400 text-center py-2">No submissions yet.</p>
+                        )}
                       </div>
                     )}
                   </div>
@@ -375,16 +450,32 @@ export default function TaskStatus() {
 function SubmissionCard({ sub, onApprove, onReject }) {
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason]       = useState("");
+  const [loading, setLoading]     = useState(null); // "approve" | "reject" | null
+
+  const handleApprove = async () => {
+    setLoading("approve");
+    await onApprove();
+    setLoading(null);
+  };
+
+  const handleReject = async () => {
+    if (!reason.trim()) return;
+    setLoading("reject");
+    await onReject(reason);
+    setLoading(null);
+    setRejecting(false);
+    setReason("");
+  };
 
   return (
-    <div className="bg-gray-50 rounded-xl p-3 space-y-2">
+    <div className="bg-gray-50 rounded-xl p-3 space-y-2 border-2 border-yellow-100">
       <div className="flex items-center justify-between">
         <p className="text-xs font-bold text-gray-700">{sub.user?.fullName || "User"}</p>
-        <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${SUB_COLORS[sub.status] || "bg-gray-100 text-gray-500"}`}>
-          {sub.status.replace(/_/g, " ")}
+        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700">
+          pending
         </span>
       </div>
-      <p className="text-[11px] text-gray-400">{new Date(sub.submittedAt).toLocaleString()}</p>
+      <p className="text-[10px] text-gray-400">{new Date(sub.submittedAt).toLocaleString()}</p>
 
       {sub.proofText && (
         <p className="text-xs bg-white rounded-lg p-2 text-gray-600">{sub.proofText}</p>
@@ -394,7 +485,7 @@ function SubmissionCard({ sub, onApprove, onReject }) {
           href={sub.proofUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-xs text-blue-500 underline break-all"
+          className="text-xs text-blue-500 underline break-all block"
         >
           {sub.proofUrl}
         </a>
@@ -402,28 +493,38 @@ function SubmissionCard({ sub, onApprove, onReject }) {
       {sub.proofImageUrls?.length > 0 && (
         <div className="flex gap-2 flex-wrap">
           {sub.proofImageUrls.map((url, i) => (
-            <img key={i} src={url} alt="" className="w-16 h-16 object-cover rounded-lg border border-gray-200" />
+            <img
+              key={i}
+              src={url}
+              alt=""
+              onClick={() => window.open(url, "_blank")}
+              className="w-16 h-16 object-cover rounded-lg border border-gray-200 cursor-pointer"
+            />
           ))}
         </div>
       )}
 
       <div className="flex gap-2">
         <button
-          onClick={onApprove}
-          className="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-1.5 rounded-xl text-xs transition"
+          onClick={handleApprove}
+          disabled={!!loading}
+          className="flex-1 bg-green-500 hover:bg-green-600 disabled:opacity-60 text-white font-bold py-1.5 rounded-xl text-xs transition flex items-center justify-center gap-1"
         >
-          ✅ Approve
+          {loading === "approve"
+            ? <i className="fas fa-spinner fa-spin"></i>
+            : "✅ Approve"}
         </button>
         <button
           onClick={() => setRejecting(!rejecting)}
-          className="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-1.5 rounded-xl text-xs transition"
+          disabled={!!loading}
+          className="flex-1 bg-red-500 hover:bg-red-600 disabled:opacity-60 text-white font-bold py-1.5 rounded-xl text-xs transition"
         >
           ❌ Reject
         </button>
       </div>
 
       {rejecting && (
-        <div className="space-y-1">
+        <div className="space-y-1.5">
           <input
             value={reason}
             onChange={(e) => setReason(e.target.value)}
@@ -431,19 +532,16 @@ function SubmissionCard({ sub, onApprove, onReject }) {
             className="w-full border-2 border-red-200 focus:border-red-400 rounded-xl px-3 py-1.5 text-xs outline-none"
           />
           <button
-            onClick={() => {
-              if (reason.trim()) {
-                onReject(reason);
-                setRejecting(false);
-                setReason("");
-              }
-            }}
-            className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-1.5 rounded-xl text-xs transition"
+            onClick={handleReject}
+            disabled={!reason.trim() || !!loading}
+            className="w-full bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-bold py-1.5 rounded-xl text-xs transition flex items-center justify-center gap-1"
           >
-            Confirm Rejection
+            {loading === "reject"
+              ? <i className="fas fa-spinner fa-spin"></i>
+              : "Confirm Rejection"}
           </button>
         </div>
       )}
     </div>
   );
-                                 }
+        }
