@@ -156,7 +156,7 @@ export default function Campaigns() {
                         </div>
                       )}
                       <button
-                        onClick={() => navigate(`/task-status?submit=${c._id}`)}
+                        onClick={() => navigate(`/submit-proof/${c._id}`)}
                         className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-2.5 rounded-xl text-sm transition"
                       >
                         Start Task & Submit Proof
