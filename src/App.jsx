@@ -24,6 +24,7 @@ import NotFound from "./Pages/NotFound";
 import PostTask from "./Pages/PostTask";
 import TaskStatus from "./Pages/TaskStatus";
 import Campaigns from "./Pages/Campaigns";
+import SubmitProof from "./Pages/SubmitProof";
 
 
 import AdminLayout from "./Pages/Admin/AdminLayout";
@@ -65,6 +66,8 @@ const App = () => (
                 <Route path="/post-task"   element={<ProtectedRoute><PostTask /></ProtectedRoute>} />
                 <Route path="/task-status" element={<ProtectedRoute><TaskStatus /></ProtectedRoute>} />
                 <Route path="/campaigns" element={<ProtectedRoute><Campaigns /></ProtectedRoute>} />
+                <Route path="/submit-proof/:id" element={<ProtectedRoute><SubmitProof /></ProtectedRoute>} />
+                
 
 
                 {/* Admin */}
