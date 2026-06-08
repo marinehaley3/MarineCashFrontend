@@ -5,16 +5,25 @@ const API = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "https://marinecashbackend.onrender.com/api",
   timeout: 10000,
   headers: {
-    "Content-Type": "application/json",
     "Cache-Control": "no-cache",
   },
 });
 
-// Auto-attach token on every request
+// Auto-attach token on every request.
+// For FormData requests axios will automatically set Content-Type to
+// multipart/form-data with the correct boundary. For JSON requests it
+// defaults to application/json. Never force Content-Type here.
 API.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("token");
     if (token) config.headers.Authorization = `Bearer ${token}`;
+
+    // If the body is FormData, delete any Content-Type override so the
+    // browser can set multipart/form-data with the correct boundary itself.
+    if (config.data instanceof FormData) {
+      delete config.headers["Content-Type"];
+    }
+
     return config;
   },
   (error) => Promise.reject(error)
