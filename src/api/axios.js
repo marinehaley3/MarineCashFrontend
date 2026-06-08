@@ -9,17 +9,19 @@ const API = axios.create({
   },
 });
 
-// Auto-attach token on every request.
-// For FormData requests axios will automatically set Content-Type to
-// multipart/form-data with the correct boundary. For JSON requests it
-// defaults to application/json. Never force Content-Type here.
+// Wipe Content-Type from axios's internal default slots so they can never
+// override the multipart/form-data boundary the browser needs to set itself.
+delete API.defaults.headers.common["Content-Type"];
+delete API.defaults.headers.post["Content-Type"];
+delete API.defaults.headers.patch["Content-Type"];
+
 API.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("token");
     if (token) config.headers.Authorization = `Bearer ${token}`;
 
-    // If the body is FormData, delete any Content-Type override so the
-    // browser can set multipart/form-data with the correct boundary itself.
+    // For FormData, remove any Content-Type so the browser sets
+    // multipart/form-data with the correct boundary automatically.
     if (config.data instanceof FormData) {
       delete config.headers["Content-Type"];
     }
