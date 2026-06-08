@@ -16,6 +16,18 @@ const Field = ({ label, name, value, onChange, type = "number", hint }) => (
   </div>
 );
 
+const Toggle = ({ name, checked, onChange, label, accent = "orange" }) => (
+  <label className="flex items-center justify-between cursor-pointer mt-3 bg-gray-50 rounded-xl px-4 py-3">
+    <span className="text-sm font-semibold text-gray-600">{label}</span>
+    <div
+      onClick={() => onChange({ target: { name, type: "checkbox", checked: !checked } })}
+      className={`relative w-12 h-6 rounded-full transition-colors ${checked ? (accent === "red" ? "bg-red-500" : "bg-green-500") : "bg-gray-300"}`}
+    >
+      <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${checked ? "translate-x-7" : "translate-x-1"}`} />
+    </div>
+  </label>
+);
+
 const AdminSettings = () => {
   const [form, setForm]       = useState({});
   const [loading, setLoading] = useState(true);
@@ -41,7 +53,6 @@ const AdminSettings = () => {
           referralTasksToActivate: s.referralTasksToActivate ?? "",
           autoApproveDays:         s.autoApproveDays         ?? "",
           minPayGlobal:            s.minPayGlobal            ?? "",
-          // Category minimums (flat keys for form)
           catMin_survey:      s.categoryMinimums?.survey      ?? "",
           catMin_video:       s.categoryMinimums?.video       ?? "",
           catMin_follow:      s.categoryMinimums?.follow      ?? "",
@@ -52,6 +63,7 @@ const AdminSettings = () => {
           catMin_other:       s.categoryMinimums?.other       ?? "",
           maintenanceMode:         s.maintenanceMode         ?? false,
           maintenanceMessage:      s.maintenanceMessage      ?? "",
+          showTopEarners:          s.showTopEarners          ?? true,
         });
       })
       .catch(console.error)
@@ -64,18 +76,16 @@ const AdminSettings = () => {
   };
 
   const handleSave = async (section) => {
-    setSaving(section.key); // ✅ compare by key string, not object reference
+    setSaving(section.key);
     try {
       const payload = {};
 
-      // Standard fields
       section.fields.forEach((f) => {
         if (form[f] !== "") {
           payload[f] = typeof form[f] === "boolean" ? form[f] : Number(form[f]) || form[f];
         }
       });
 
-      // Category minimums — build nested object from flat catMin_ keys
       if (section.key === "campaigns") {
         const CATS = ["survey", "video", "follow", "signup", "offer", "app_install", "game", "other"];
         const categoryMinimums = {};
@@ -122,8 +132,8 @@ const AdminSettings = () => {
       key: "campaigns",
       fields: ["campaignFeePct", "minPayGlobal"],
       inputs: [
-        { label: "Campaign Fee %",        name: "campaignFeePct", hint: "% cut from total campaign budget when funded (e.g. 20 means 20% goes to platform)" },
-        { label: "Global Min Pay/Task ($)", name: "minPayGlobal",  hint: "Applies to all categories unless a category minimum is set below" },
+        { label: "Campaign Fee %",           name: "campaignFeePct", hint: "% cut from total campaign budget when funded" },
+        { label: "Global Min Pay/Task ($)",   name: "minPayGlobal",   hint: "Applies to all categories unless overridden below" },
       ],
       extras: (
         <div className="mt-3 space-y-2">
@@ -168,16 +178,12 @@ const AdminSettings = () => {
         { label: "Check-in Amount ($)", name: "dailyCheckInAmount", hint: "Amount user claims daily" },
       ],
       extras: (
-        <label className="flex items-center gap-3 cursor-pointer mt-3">
-          <input
-            type="checkbox"
-            name="dailyCheckInEnabled"
-            checked={form.dailyCheckInEnabled || false}
-            onChange={handleChange}
-            className="w-5 h-5 accent-orange-500"
-          />
-          <span className="text-sm font-semibold text-gray-600">Enable Daily Check-in</span>
-        </label>
+        <Toggle
+          name="dailyCheckInEnabled"
+          checked={form.dailyCheckInEnabled || false}
+          onChange={handleChange}
+          label="Enable Daily Check-in"
+        />
       ),
     },
     {
@@ -199,6 +205,20 @@ const AdminSettings = () => {
       ],
     },
     {
+      title: "🏆 Top Earners",
+      key: "topearners",
+      fields: ["showTopEarners"],
+      inputs: [],
+      extras: (
+        <Toggle
+          name="showTopEarners"
+          checked={form.showTopEarners ?? true}
+          onChange={handleChange}
+          label="Show Top Earners leaderboard to users"
+        />
+      ),
+    },
+    {
       title: "🔧 Maintenance",
       key: "maintenance",
       fields: ["maintenanceMode", "maintenanceMessage"],
@@ -206,16 +226,13 @@ const AdminSettings = () => {
         { label: "Maintenance Message", name: "maintenanceMessage", type: "text", hint: "Shown to users while maintenance is ON" },
       ],
       extras: (
-        <label className="flex items-center gap-3 cursor-pointer mt-3">
-          <input
-            type="checkbox"
-            name="maintenanceMode"
-            checked={form.maintenanceMode || false}
-            onChange={handleChange}
-            className="w-5 h-5 accent-red-500"
-          />
-          <span className="text-sm font-semibold text-gray-600">Enable Maintenance Mode</span>
-        </label>
+        <Toggle
+          name="maintenanceMode"
+          checked={form.maintenanceMode || false}
+          onChange={handleChange}
+          label="Enable Maintenance Mode"
+          accent="red"
+        />
       ),
     },
   ];
