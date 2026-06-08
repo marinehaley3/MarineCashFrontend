@@ -1,5 +1,4 @@
-// src/Pages/Home.jsx
-import React, { useContext, useState, useEffect } from "react";
+import React, { useContext, useState, useEffect, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AuthContext } from "../Context/AuthContext";
 import { WalletContext } from "../Context/WalletContext";
@@ -19,17 +18,6 @@ const TAG_BG = {
 };
 const TAG_LABEL = {
   general: "📢", important: "⚠️", hot: "🔥", new: "🎉", warning: "🚨",
-};
-
-// Returns how many hours:minutes until midnight
-const timeUntilMidnight = () => {
-  const now = new Date();
-  const midnight = new Date();
-  midnight.setHours(24, 0, 0, 0);
-  const diff = midnight - now;
-  const h = Math.floor(diff / 1000 / 60 / 60);
-  const m = Math.floor((diff / 1000 / 60) % 60);
-  return `${h}h ${m}m`;
 };
 
 const AnnouncementTeaser = ({ unread }) => {
@@ -53,31 +41,22 @@ const AnnouncementTeaser = ({ unread }) => {
             </span>
           )}
         </div>
-        <button
-          onClick={() => navigate("/announcements")}
-          className="text-xs text-orange-500 font-bold hover:underline"
-        >
+        <button onClick={() => navigate("/announcements")} className="text-xs text-orange-500 font-bold hover:underline">
           See all →
         </button>
       </div>
-
       {items.length === 0 ? (
         <p className="text-xs text-gray-400">No announcements yet.</p>
       ) : (
         <div className="space-y-2">
           {items.map(item => (
-            <div
-              key={item._id}
-              onClick={() => navigate("/announcements")}
-              className="flex items-start gap-2 cursor-pointer hover:bg-orange-50 rounded-xl p-1.5 transition"
-            >
+            <div key={item._id} onClick={() => navigate("/announcements")}
+              className="flex items-start gap-2 cursor-pointer hover:bg-orange-50 rounded-xl p-1.5 transition">
               <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 ${TAG_BG[item.tag] || TAG_BG.general}`}>
                 {TAG_LABEL[item.tag] || "📢"}
               </span>
               <div className="min-w-0">
-                {item.title && (
-                  <p className="text-xs font-bold text-gray-700 truncate">{item.title}</p>
-                )}
+                {item.title && <p className="text-xs font-bold text-gray-700 truncate">{item.title}</p>}
                 <p className="text-xs text-gray-500 truncate">{item.text}</p>
               </div>
             </div>
@@ -96,15 +75,15 @@ export default function Home() {
   const { userUnread, formatBadge } = useContext(SupportBadgeContext);
   const { unread: announcementUnread } = useContext(AnnouncementBadgeContext);
 
-  const [code, setCode] = useState("");
-  const [msg, setMsg] = useState("");
+  const [code, setCode]       = useState("");
+  const [msg, setMsg]         = useState("");
   const [claiming, setClaiming] = useState(false);
 
   // Check-in state
-  const [checkInAmount, setCheckInAmount] = useState(null);
+  const [checkInAmount, setCheckInAmount]   = useState(null);
   const [alreadyClaimed, setAlreadyClaimed] = useState(false);
   const [checkInEnabled, setCheckInEnabled] = useState(true);
-  const [countdown, setCountdown] = useState("");
+  const [countdown, setCountdown]           = useState("");
 
   const menuItems = [
     { icon: "fa-coins",           color: "text-green-500", label: "Earn",          to: "/earn" },
@@ -121,34 +100,41 @@ export default function Home() {
     { icon: "fa-crown",           color: "text-green-500", label: "Top Earners",   to: "/top-earners" },
   ];
 
-  // Load daily check-in settings + whether user already claimed today
+  // ── Load settings + check claim status from backend (timezone-aware) ──
+  const loadCheckIn = useCallback(async () => {
+    try {
+      const res = await API.get("/admin/settings");
+      const s = res.data.settings || res.data;
+      setCheckInAmount(s.dailyCheckInAmount ?? null);
+      setCheckInEnabled(s.dailyCheckInEnabled ?? false);
+    } catch {}
+
+    try {
+      const res = await API.get("/admin/checkin-status");
+      setAlreadyClaimed(res.data.claimed);
+    } catch {}
+  }, []);
+
   useEffect(() => {
-    const loadCheckIn = async () => {
-      try {
-        const res = await API.get("/admin/settings");
-        const s = res.data.settings || res.data;
-        setCheckInAmount(s.dailyCheckInAmount ?? null);
-        setCheckInEnabled(s.dailyCheckInEnabled ?? false);
-      } catch {
-        // silently fail
-      }
-
-      if (user?.lastCheckIn) {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        if (new Date(user.lastCheckIn) >= today) {
-          setAlreadyClaimed(true);
-        }
-      }
-    };
     loadCheckIn();
-  }, [user]);
+  }, [loadCheckIn]);
 
-  // Countdown ticker when already claimed
+  // ── Countdown until user's local midnight ──
   useEffect(() => {
     if (!alreadyClaimed) return;
-    setCountdown(timeUntilMidnight());
-    const interval = setInterval(() => setCountdown(timeUntilMidnight()), 60000);
+
+    const getCountdown = () => {
+      const now = new Date();
+      const midnight = new Date();
+      midnight.setHours(24, 0, 0, 0);
+      const diff = midnight - now;
+      const h = Math.floor(diff / 1000 / 60 / 60);
+      const m = Math.floor((diff / 1000 / 60) % 60);
+      return `${h}h ${m}m`;
+    };
+
+    setCountdown(getCountdown());
+    const interval = setInterval(() => setCountdown(getCountdown()), 60000);
     return () => clearInterval(interval);
   }, [alreadyClaimed]);
 
@@ -212,14 +198,9 @@ export default function Home() {
             ✓ Claimed
           </span>
         ) : (
-          <button
-            onClick={handleCheckIn}
-            disabled={claiming}
-            className="bg-green-500 hover:bg-green-600 active:scale-95 transition-all text-white font-bold rounded-xl px-4 py-2 text-sm shadow disabled:opacity-50"
-          >
-            {claiming
-              ? "Claiming..."
-              : `Claim${checkInAmount != null ? ` $${Number(checkInAmount).toFixed(3)}` : ""}`}
+          <button onClick={handleCheckIn} disabled={claiming}
+            className="bg-green-500 hover:bg-green-600 active:scale-95 transition-all text-white font-bold rounded-xl px-4 py-2 text-sm shadow disabled:opacity-50">
+            {claiming ? "Claiming..." : `Claim${checkInAmount != null ? ` $${Number(checkInAmount).toFixed(3)}` : ""}`}
           </button>
         )}
       </section>
@@ -235,22 +216,14 @@ export default function Home() {
       <main className="grid grid-cols-3 gap-4 text-center px-4 py-4 m-2">
         {menuItems.map((item) =>
           item.external ? (
-            <a
-              key={item.label}
-              href={item.to}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="bg-white shadow rounded-xl p-3 flex flex-col items-center hover:scale-105 transition-all"
-            >
+            <a key={item.label} href={item.to} target="_blank" rel="noopener noreferrer"
+              className="bg-white shadow rounded-xl p-3 flex flex-col items-center hover:scale-105 transition-all">
               <i className={`fas ${item.icon} ${item.color} text-4xl`}></i>
               <p className="text-xs font-semibold mt-2 text-gray-700">{item.label}</p>
             </a>
           ) : (
-            <Link
-              key={item.label}
-              to={item.to}
-              className="relative bg-white shadow rounded-xl p-3 flex flex-col items-center hover:scale-105 transition-all"
-            >
+            <Link key={item.label} to={item.to}
+              className="relative bg-white shadow rounded-xl p-3 flex flex-col items-center hover:scale-105 transition-all">
               <div className="relative">
                 <i className={`fas ${item.icon} ${item.color} text-4xl`}></i>
                 {item.badge > 0 && (
@@ -272,17 +245,12 @@ export default function Home() {
       <section className="bg-white shadow mx-2 mt-2 p-4 rounded-xl">
         <p className="font-semibold text-gray-700 mb-2">🎁 Redeem Code</p>
         <form onSubmit={handleRedeem} className="flex gap-2">
-          <input
-            type="text"
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
+          <input type="text" value={code} onChange={(e) => setCode(e.target.value)}
             placeholder="Enter Reward Code"
             className="flex-1 border-2 border-blue-400 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-orange-400"
           />
-          <button
-            type="submit"
-            className="bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl px-4 py-2 text-sm transition-all"
-          >
+          <button type="submit"
+            className="bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl px-4 py-2 text-sm transition-all">
             Redeem
           </button>
         </form>
@@ -291,4 +259,4 @@ export default function Home() {
       <BottomNav />
     </div>
   );
-                              }
+      }
