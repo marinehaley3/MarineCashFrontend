@@ -3,6 +3,7 @@ import { AuthContext } from "../Context/AuthContext";
 import { WalletContext } from "../Context/WalletContext";
 import API from "../api/axios";
 import BottomNav from "../Components/BottomNav";
+import BadgeIcon from "../Components/BadgeIcon";
 
 export default function Profile() {
   const { user, setUser, logout } = useContext(AuthContext);
@@ -48,7 +49,6 @@ export default function Profile() {
     try {
       const fd = new FormData();
       fd.append("avatar", file);
-      // No manual Content-Type — browser sets it with the correct multipart boundary
       const res = await API.post("/users/avatar", fd);
       setUser((prev) => ({ ...prev, photo: res.data.photo }));
       flash("✅ Photo updated!");
@@ -61,6 +61,8 @@ export default function Profile() {
 
   const avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.fullName || "U")}&background=f97316&color=fff&size=128`;
 
+  const hasBadge = user?.badge?.imageUrl && !user?.badge?.hidden;
+
   return (
     <div className="bg-gray-100 min-h-screen pb-24">
       <nav className="bg-orange-400 w-full flex items-center justify-between px-4 sticky top-0 z-50 shadow-md" style={{ height: "64px" }}>
@@ -69,12 +71,34 @@ export default function Profile() {
       </nav>
 
       <div className="bg-white shadow rounded-xl mx-3 mt-4 p-5 flex flex-col items-center text-center">
-        <div className="relative">
+        {/* Avatar with badge overlay (Meta-style) */}
+        <div className="relative inline-block">
           <img
             src={user?.photo || avatar}
             alt="Avatar"
             style={{ width: "80px", height: "80px", borderRadius: "50%", objectFit: "cover", border: "3px solid #f97316" }}
           />
+          {/* Badge pinned bottom-right of avatar like Meta verification */}
+          {hasBadge && (
+            <span
+              className="absolute bottom-0 left-0 flex items-center justify-center"
+              style={{
+                width: "26px",
+                height: "26px",
+                borderRadius: "50%",
+                background: "#fff",
+                boxShadow: "0 0 0 2px #f97316",
+                padding: "2px",
+              }}
+              title={user.badge.name}
+            >
+              <img
+                src={user.badge.imageUrl}
+                alt={user.badge.name}
+                style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover" }}
+              />
+            </span>
+          )}
           <button
             onClick={() => fileRef.current?.click()}
             disabled={uploadingPhoto}
@@ -94,17 +118,38 @@ export default function Profile() {
           />
         </div>
 
-        <h2 className="text-base font-bold text-gray-800 mt-3">{user?.fullName}</h2>
+        {/* Name row with inline badge (Meta verification style) */}
+        <div className="flex items-center justify-center gap-1 mt-3">
+          <h2 className="text-base font-bold text-gray-800">{user?.fullName}</h2>
+          {hasBadge && <BadgeIcon badge={user.badge} size={18} />}
+        </div>
+
         <p className="text-gray-400 text-xs mt-0.5">
           Member since {new Date(user?.createdAt).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
         </p>
-        {user?.badge && (
-          <div className="mt-2 flex items-center gap-2">
-            <span className="bg-blue-500 text-white text-xs px-3 py-1 rounded-full">
-              {user?.referralLevel ? `Level ${user.referralLevel}` : "Member"}
+
+        {/* Level pill + badge name pill */}
+        <div className="mt-2 flex items-center justify-center gap-2 flex-wrap">
+          <span className="bg-blue-500 text-white text-xs px-3 py-1 rounded-full">
+            {user?.referralLevel ? `Level ${user.referralLevel}` : "Member"}
+          </span>
+          {hasBadge && (
+            <span className="flex items-center gap-1.5 bg-orange-50 border border-orange-200 px-2.5 py-1 rounded-full">
+              <img
+                src={user.badge.imageUrl}
+                alt={user.badge.name}
+                style={{
+                  width: "14px",
+                  height: "14px",
+                  borderRadius: "50%",
+                  objectFit: "cover",
+                  boxShadow: "0 0 0 1.5px #f97316",
+                }}
+              />
+              <span className="text-[11px] font-bold text-orange-600">{user.badge.name}</span>
             </span>
-          </div>
-        )}
+          )}
+        </div>
 
         {msg.text && (
           <p className={`text-xs font-semibold mt-2 ${msg.success ? "text-green-600" : "text-red-500"}`}>
@@ -187,4 +232,4 @@ export default function Profile() {
       <BottomNav />
     </div>
   );
-}
+    }
