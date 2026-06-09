@@ -9,7 +9,6 @@ function formatTime(date) {
   return new Date(date).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
-// Returns only the first name from a full name string
 function getFirstName(fullName) {
   if (!fullName) return "Unknown";
   return fullName.trim().split(" ")[0];
@@ -26,11 +25,14 @@ export default function MessageBubble({ msg, isMe, isAdmin, userId, onReact, onD
   const senderFullName = msg.sender?.fullName || "Unknown";
   const senderFirstName = getFirstName(senderFullName);
   const isAdminMsg = msg.isAdminMessage;
-  const senderBadge = msg.sender?.badge; // badge object populated from backend
+  const senderBadge = msg.sender?.badge;
+  const senderPhoto = msg.sender?.photo;
 
-  const avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(senderFirstName)}&background=${
+  const fallbackAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(senderFirstName)}&background=${
     isMe ? "f97316" : isAdminMsg ? "7c3aed" : "6366f1"
   }&color=fff`;
+
+  const avatarSrc = senderPhoto || fallbackAvatar;
 
   // ── Swipe handlers ───────────────────────────────────────────────
   const handleTouchStart = (e) => {
@@ -68,7 +70,12 @@ export default function MessageBubble({ msg, isMe, isAdmin, userId, onReact, onD
     >
       {/* Other user's avatar */}
       {!isMe && (
-        <img src={avatar} alt={senderFirstName} className="w-8 h-8 rounded-full mb-5 shrink-0" />
+        <img
+          src={avatarSrc}
+          alt={senderFirstName}
+          className="w-8 h-8 rounded-full mb-5 shrink-0 object-cover"
+          onError={(e) => { e.target.src = fallbackAvatar; }}
+        />
       )}
 
       {/* Swipe wrapper */}
@@ -89,7 +96,7 @@ export default function MessageBubble({ msg, isMe, isAdmin, userId, onReact, onD
 
         <div className={`flex flex-col ${isMe ? "items-end" : "items-start"} max-w-[75vw]`}>
 
-          {/* Sender name row (non-admin only, non-me only) */}
+          {/* Sender name + badge row (non-admin only, non-me only) */}
           {!isMe && !isAdminMsg && (
             <div className="flex items-center gap-1 mb-0.5">
               <span className="text-xs font-bold text-gray-600">{senderFirstName}</span>
@@ -97,7 +104,7 @@ export default function MessageBubble({ msg, isMe, isAdmin, userId, onReact, onD
             </div>
           )}
 
-          {/* Admin label — no name, just the pill */}
+          {/* Admin label */}
           {!isMe && isAdminMsg && (
             <div className="flex items-center gap-1 mb-0.5">
               <span className="text-[9px] font-extrabold bg-purple-600 text-white px-1.5 py-0.5 rounded-full uppercase tracking-wide">
@@ -106,7 +113,7 @@ export default function MessageBubble({ msg, isMe, isAdmin, userId, onReact, onD
             </div>
           )}
 
-          {/* My own admin pill (when admin is the sender = isMe) */}
+          {/* My own admin pill */}
           {isMe && isAdminMsg && (
             <span className="text-[9px] font-extrabold bg-purple-600 text-white px-1.5 py-0.5 rounded-full uppercase tracking-wide mb-0.5 self-end">
               Admin
@@ -190,8 +197,13 @@ export default function MessageBubble({ msg, isMe, isAdmin, userId, onReact, onD
 
       {/* My own avatar */}
       {isMe && (
-        <img src={avatar} alt="you" className="w-8 h-8 rounded-full mb-5 shrink-0" />
+        <img
+          src={avatarSrc}
+          alt="you"
+          className="w-8 h-8 rounded-full mb-5 shrink-0 object-cover"
+          onError={(e) => { e.target.src = fallbackAvatar; }}
+        />
       )}
     </div>
   );
-        }
+      }
